@@ -75,7 +75,8 @@ int main(void)
         }
         */
 
-        rhs[(N/2-1)*N + N/2-1] = 1.0;
+        rhs[(N/2-1)*N + N/4-1] = 1.0;
+        rhs[(N/2-1)*N + 3*N/4-1] = 1.0;
                                                                 // */
         int lda = rr;   // Leading dimension of the matrix.
         int ldb = lda;  // Leading dimension of the RHS.
