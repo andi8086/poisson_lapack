@@ -9,14 +9,6 @@ int main(void)
         int kl = 1;     // Number of lower diagonals.
         int ku = 1;     // Number of upper diagonals.
         int nrhs = 1;   // Number of RHS.
-/*
-   [    1,     0,     0,     0,    0,    0]     [1]
-    [27.50,   -50,  22.5,     0,    0,    0]     [1]
-    [    0, 27.50,   -50,  22.5,    0,    0] x = [1]
-    [    0,     0, 27.50,   -50, 22.5,    0]     [1]
-    [    0,     0,     0, 27.50,  -50, 22.5]     [1]
-    [    0,     0,     0,    -1,    4,-2.60]     [0]
-    */
 
         /* vals is band storage,
          * rows KL + 1 to 2*KL + KU + 1   is the matrix
@@ -56,16 +48,16 @@ int main(void)
                 rhs[rr-i-1] = 1.0*1.0/(rr*rr);
         }
                                                                 // */
-      int lda = rr;   // Leading dimension of the matrix.
-      int ipiv[rr];    // Information on pivoting array.
-      int ldb = lda;  // Leading dimension of the RHS.
-      int info = 0;   // Evaluation variable for solution process.
-      int ii;         // Iterator.
+        int lda = rr;   // Leading dimension of the matrix.
+        int ipiv[rr];    // Information on pivoting array.
+        int ldb = lda;  // Leading dimension of the RHS.
+        int info = 0;   // Evaluation variable for solution process.
+        int ii;         // Iterator.
 
-      dgbsv_(&rr, &kl, &ku, &nrhs, mat, &lda, ipiv, rhs, &ldb, &info);
-//      printf("info = %d\n", info);
-      for (ii = 0; ii < rr; ii++) {
-        printf("%.9f, %.9f\n", 1.0/rr*ii, rhs[ii]);
-      }
-      putchar('\n');return 0;
+        dgbsv_(&rr, &kl, &ku, &nrhs, mat, &lda, ipiv, rhs, &ldb, &info);
+        //      printf("info = %d\n", info);
+        for (ii = 0; ii < rr; ii++) {
+                printf("%.9f, %.9f\n", 1.0/rr*ii, rhs[ii]);
+        }
+        putchar('\n');return 0;
 }
