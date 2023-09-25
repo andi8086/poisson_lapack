@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <lapacke.h>
+#include <openblas64/lapacke.h>
 #include <stdlib.h>
 #include <string.h>
 

@@ -1,18 +1,32 @@
 #include <stdio.h>
-#include <lapacke.h>
+#include <openblas64/lapacke.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define N 128
+
+int *ipiv;
+size_t rr = N*N;     // Rank.
+int kl = 1;     // Number of lower diagonals.
+int ku = 1;     // Number of upper diagonals.
+int nrhs = 1;   // Number of RHS.
+double *rhs;
+
 int main(void)
 {
-        int N = 64;
-        int rr = N*N;     // Rank.
-        int kl = 1;     // Number of lower diagonals.
-        int ku = 1;     // Number of upper diagonals.
-        int nrhs = 1;   // Number of RHS.
 
         double *mat;
         mat = malloc(rr*rr*sizeof(double));
+        if (!mat) {
+                fprintf(stderr, "Out of memory\n");
+                return -1;
+        }
+        ipiv = malloc(rr * sizeof(int));
+        if (!ipiv) {
+                fprintf(stderr, "Out of memory\n");
+                free(mat);
+                return -1;
+        }
         memset(mat, 0, rr*rr*sizeof(double));
         for (int k = 0; k < rr; k+=N) {
                 /* inner blocks */
@@ -46,9 +60,14 @@ int main(void)
                 printf("\n");
         }
 */
-        double *rhs;
 
         rhs = malloc(rr*sizeof(double));
+        if (!rhs) {
+                fprintf(stderr, "Out of memory\n");
+                free(ipiv);
+                free(mat);
+                return -1;
+        }
         memset(rhs,0,rr*sizeof(double));
 /*        for (int i = 0; i < 100; i++) {
                 rhs[i] = -1.0*1.0/(rr*rr);
@@ -56,18 +75,17 @@ int main(void)
         }
         */
 
-      rhs[(N/2-1)*N + N/2-1] = 1.0;
+        rhs[(N/2-1)*N + N/2-1] = 1.0;
                                                                 // */
-      int lda = rr;   // Leading dimension of the matrix.
-      int ipiv[rr];    // Information on pivoting array.
-      int ldb = lda;  // Leading dimension of the RHS.
-      int info = 0;   // Evaluation variable for solution process.
-      int ii;         // Iterator.
+        int lda = rr;   // Leading dimension of the matrix.
+        int ldb = lda;  // Leading dimension of the RHS.
+        int info = 0;   // Evaluation variable for solution process.
+        int ii;         // Iterator.
 
-      int res = LAPACKE_dsysv(LAPACK_COL_MAJOR, 'U', rr, nrhs, mat, lda, ipiv, rhs, ldb);
+        int res = LAPACKE_dsysv(LAPACK_COL_MAJOR, 'U', rr, nrhs, mat, lda, ipiv, rhs, ldb);
 //      printf("res = %d\n", res);
 //      printf("info = %d\n", info);
-      for (int iy = 0; iy < N; iy++) {
+        for (int iy = 0; iy < N; iy++) {
                 if (iy == 0) {
                         printf("%d ", N);
                         for (int ix = 0; ix < N; ix++) {
@@ -83,6 +101,11 @@ int main(void)
                         printf("%.6f ", rhs[iy*N+ix]);
                 }
                 printf("\n");
-      }
-      putchar('\n');return 0;
+        }
+        free(rhs);
+        free(ipiv);
+        free(mat);
+
+        return 0;
+
 }
