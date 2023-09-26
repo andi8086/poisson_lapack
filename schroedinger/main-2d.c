@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <GL/glut.h>
 
+#define DT 0.001
 #define N 128
 
 int *ipiv;
@@ -254,7 +255,7 @@ void update_frame(void)
                 psi2[k] += V[k] * psi2[k];
         }
 //        potential(psi2, rr);
-        timestep(psi, psi2, 0.001);
+        timestep(psi, psi2, DT);
 
         double norm = 0.0;
         for (int i = 0; i < rr; i++) {
@@ -282,7 +283,7 @@ int main(int argc, char **argv)
         pthread_mutex_init(&psi_mutex, NULL);
         glutInit(&argc, argv);
         glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-        glutInitWindowSize(512, 512);
+        glutInitWindowSize(640, 640);
         glutInitWindowPosition(100, 100);
         glutCreateWindow("Psi");
 
