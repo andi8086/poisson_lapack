@@ -17,6 +17,8 @@ int nrhs = 1;   // Number of RHS.
 lapack_complex_double *psi;    // complex wave function
 lapack_complex_double *psi2;    // complex wave function
 pthread_mutex_t psi_mutex;
+lapack_complex_double *V;
+
 
 void laplace(size_t rr, lapack_complex_double *mat)
 {
@@ -130,7 +132,7 @@ void psi_to_file(FILE *dat, lapack_complex_double *v)
 }
 
 
-void potential(lapack_complex_double *psi, size_t rr)
+void potential(lapack_complex_double *V, size_t rr)
 {
         size_t idx;
         for (int j = 0; j < N; j++) {
@@ -141,8 +143,7 @@ void potential(lapack_complex_double *psi, size_t rr)
                                      (j > 2*N/5+N/32 && j < 3*N/5-N/32) ||
                                      (j > 3*N/5+N/32)) {
                                         idx = j*N + i;
-                                        psi[idx] -= 1.0*psi[idx];
-                                        //mat[idx * rr + idx] -= 1.0;
+                                        V[idx] = 1.0;
                                 }
                         }
                 }
@@ -224,6 +225,15 @@ void display_frame(void)
                                 glVertex3f(1.0/N*i, 1.0/N*(j+1), 0.0);
                                 glVertex3f(1.0/N*i, 1.0/N*j, 0.0);
                         glEnd();
+                                if (V[j*N+i] == 1.0) {
+                                        glBegin(GL_QUADS);
+                                        glColor3f(1.0, 1.0, 1.0);
+                                        glVertex3f(1.0/N*(i+1), 1.0/N*j, 0.0);
+                                        glVertex3f(1.0/N*(i+1), 1.0/N*(j+1), 0.0);
+                                        glVertex3f(1.0/N*i, 1.0/N*(j+1), 0.0);
+                                        glVertex3f(1.0/N*i, 1.0/N*j, 0.0);
+                                        glEnd();
+                                }
                 }
 
         }
@@ -240,7 +250,10 @@ void update_frame(void)
         /* Evaluate time development */
         pthread_mutex_lock(&psi_mutex);
         laplace_2d(psi2, rr, psi);
-        potential(psi2, rr);
+        for (size_t k = 0; k < rr; k++) {
+                psi2[k] += V[k] * psi2[k];
+        }
+//        potential(psi2, rr);
         timestep(psi, psi2, 0.001);
 
         double norm = 0.0;
@@ -281,6 +294,9 @@ int main(int argc, char **argv)
         glutDisplayFunc(display_frame);
         glutIdleFunc(update_frame);
 
+        V = malloc(rr* sizeof(lapack_complex_double));
+        memset(V, 0, rr*sizeof(lapack_complex_double));
+        potential(V, rr);
         psi2 = malloc(rr * sizeof(lapack_complex_double));
         psi = malloc(rr*sizeof(lapack_complex_double));
         if (!psi) {
@@ -295,6 +311,7 @@ int main(int argc, char **argv)
         glutTimerFunc(50, update_display, 0);
         glutMainLoop();
 
+        free(V);
         free(psi2);
         free(psi);
         free(ipiv);
