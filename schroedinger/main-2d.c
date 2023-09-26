@@ -307,7 +307,7 @@ int main(int argc, char **argv)
 //        memset(psi,0,rr*sizeof(lapack_complex_double));
 //        memset(psi2, 0, rr*sizeof(lapack_complex_double));
 
-        gaussian_pulse(psi, 0.2, 0.5, 0.5, 0.02, -100000.0);
+        gaussian_pulse(psi, 0.2, 0.5, 0.5, 0.02, 7777.0);
 
         glutTimerFunc(50, update_display, 0);
         glutMainLoop();
