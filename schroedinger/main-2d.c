@@ -4,8 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
+#include <GL/glut.h>
 
-#define N 128 
+#define N 128
 
 int *ipiv;
 size_t rr = N*N;     // Rank.
@@ -14,6 +16,7 @@ int ku = 1;     // Number of upper diagonals.
 int nrhs = 1;   // Number of RHS.
 lapack_complex_double *psi;    // complex wave function
 lapack_complex_double *psi2;    // complex wave function
+pthread_mutex_t psi_mutex;
 
 void laplace(size_t rr, lapack_complex_double *mat)
 {
@@ -57,7 +60,6 @@ void laplace_2d(lapack_complex_double *psi2, size_t rr, lapack_complex_double *p
                                 //mat[(k+l)*rr + (k+l-1)] = -1.0;
                         }
                         /* diagonal of inner B matrix */
-                        
                         psi2[k+l] += 4.0*psi[k+l];
 //                        mat[(k+l)*rr + (k+l)] = 4.0;
                         /* upper tridiagonal elements of inner B matrix */
@@ -78,8 +80,6 @@ void laplace_2d(lapack_complex_double *psi2, size_t rr, lapack_complex_double *p
                         }
                 }
         }
-               
-
 }
 
 
@@ -105,7 +105,7 @@ void gaussian_pulse(lapack_complex_double *psi,
 }
 
 
-void psi_to_file(FILE *dat, lapack_complex_double *psi)
+void psi_to_file(FILE *dat, lapack_complex_double *v)
 {
         for (int iy = 0; iy < N; iy++) {
                 if (iy == 0) {
@@ -177,85 +177,128 @@ void timestep(lapack_complex_double *psi, lapack_complex_double *psi2,
         }
 }
 
-int main(void)
+
+void glcolor_heatmap(double min, double max, double val)
 {
-
-       // lapack_complex_double *mat;
-       // mat = malloc(rr*rr*sizeof(lapack_complex_double));
-       /* if (!mat) {
-                fprintf(stderr, "Out of memory\n");
-                return -1;
-        }
-        ipiv = malloc(rr * sizeof(int));
-        if (!ipiv) {
-                fprintf(stderr, "Out of memory\n");
-                free(mat);
-                return -1;
+        float r, g, b;
+        double scale = max - min;
+        double rval = val / scale + min;
+        if (rval <= 0) {
+                glColor3f(0.0, 0.0, 0.0);
+                return;
         }
 
-        laplace(rr, mat);
-        potential(rr, mat);
-        */
+        if (rval >= 1.0) {
+                glColor3f(1.0, 1.0, 1.0);
+        }
+
+        /* intervals:
+        0..1/4  black to blue
+        1/4..2/4  blue down, green up
+        2/4..3/4  keep green, red up
+        3/4..4/4  keep green and red, blue up */
+        if (rval < 0.25) {
+                glColor3f(0.0, 0.0, rval*4);
+        } else if (rval < 0.5) {
+                glColor3f((rval - 0.25)*4, 0.0, 1.0-(rval - 0.25)*4);
+        } else if (rval < 0.75) {
+                glColor3f(1.0, (rval - 0.5)*4,  0.0);
+        } else {
+                glColor3f(1.0, 1.0, (rval - 0.75)*4);
+        }
+}
+
+
+void display_frame(void)
+{
+//        glDrawBuffer(GL_BACK);
+        pthread_mutex_lock(&psi_mutex);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        for (int i = 1; i < N; i++) {
+                for (int j = 1; j < N; j++) {
+                        glBegin(GL_QUADS);
+                                glcolor_heatmap(0.0, 0.2,
+                                      lapack_complex_double_real(conj(psi2[j*N+i])*psi2[j*N+i])*1.0/rr);
+                                glVertex3f(1.0/N*(i+1), 1.0/N*j, 0.0);
+                                glVertex3f(1.0/N*(i+1), 1.0/N*(j+1), 0.0);
+                                glVertex3f(1.0/N*i, 1.0/N*(j+1), 0.0);
+                                glVertex3f(1.0/N*i, 1.0/N*j, 0.0);
+                        glEnd();
+                }
+
+        }
+        glutSwapBuffers();
+        pthread_mutex_unlock(&psi_mutex);
+}
+
+
+long frame_counter = 0;
+
+
+void update_frame(void)
+{
+        /* Evaluate time development */
+        pthread_mutex_lock(&psi_mutex);
+        laplace_2d(psi2, rr, psi);
+        potential(psi2, rr);
+        timestep(psi, psi2, 0.001);
+
+        double norm = 0.0;
+        for (int i = 0; i < rr; i++) {
+                /* we sum over  (psi*_ij psi_ij dx dy) */
+                norm += conj(psi[i])*psi[i]*1.0/rr;
+        }
+        for (int i = 0; i < rr; i++) {
+                psi2[i] = psi[i]/norm;
+        }
+ //       visualize_potential(psi2, psi, rr);
+        pthread_mutex_unlock(&psi_mutex);
+        frame_counter++;
+}
+
+
+void update_display(int foo)
+{
+        glutTimerFunc(25, update_display, 0);
+        glutPostRedisplay();
+}
+
+
+int main(int argc, char **argv)
+{
+        pthread_mutex_init(&psi_mutex, NULL);
+        glutInit(&argc, argv);
+        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+        glutInitWindowSize(512, 512);
+        glutInitWindowPosition(100, 100);
+        glutCreateWindow("Psi");
+
+        glClearColor(0.0, 0.0, 0.0, 0.0);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+//        glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+        glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+        glutDisplayFunc(display_frame);
+        glutIdleFunc(update_frame);
+
         psi2 = malloc(rr * sizeof(lapack_complex_double));
         psi = malloc(rr*sizeof(lapack_complex_double));
         if (!psi) {
                 fprintf(stderr, "Out of memory\n");
                 return -1;
         }
-        memset(psi,0,rr*sizeof(lapack_complex_double));
-        memset(psi2, 0, rr*sizeof(lapack_complex_double));
-                                                                // */
-        int lda = rr;   // Leading dimension of the matrix.
-        int ldb = lda;  // Leading dimension of the RHS.
-        int info = 0;   // Evaluation variable for solution process.
-        int ii;         // Iterator.
-
-        /* everything seems to be invertedly ordered in memory, so we
-         * have to tell LAPACK that we use the lower part of the
-         * symmetric matrix, and also column major order, although
-         * in C we have row major order */
-/*        int res = LAPACKE_zsysv(
-                LAPACK_COL_MAJOR, 'L', rr, nrhs, mat, lda, ipiv, psi, ldb); */
-//      printf("res = %d\n", res);
-//      printf("info = %d\n", info);
+//        memset(psi,0,rr*sizeof(lapack_complex_double));
+//        memset(psi2, 0, rr*sizeof(lapack_complex_double));
 
         gaussian_pulse(psi, 0.2, 0.5, 0.5, 0.02, -100000.0);
 
-        char filename[256];
-/* d psi = laplace psi dt */
-        /* normalize wave function with beta */
-
-        lapack_complex_double beta = 1;
-        lapack_complex_double dt = lapack_make_complex_double(0, 0.001);
-        sprintf(filename, "out/psi.dat");
-        FILE *dat = fopen(filename, "w");
-        for (int i = 0; i < 100000; i++) {
-                laplace_2d(psi2, rr, psi);
-                potential(psi2, rr);
-                timestep(psi, psi2, 0.001);
-
-                /*cblas_zgemv(CblasColMajor, CblasNoTrans, rr, rr, &dt, mat,
-                      lda, psi, 1, &beta, psi, 1); */
-                double norm = 0.0;
-                for (int i = 0; i < rr; i++) {
-                        /* we sum over  (psi*_ij psi_ij dx dy) */
-                        norm += conj(psi[i])*psi[i]*1.0/rr;
-                }
-                for (int i = 0; i < rr; i++) {
-                        psi[i] /= norm;
-                }
-
-                if (i % 1000 == 0) {
-                        visualize_potential(psi2, psi, rr);
-                        psi_to_file(dat, psi2);
-                }
-                printf("time step %d\n", i);
-        }
-        fclose(dat);
+        glutTimerFunc(50, update_display, 0);
+        glutMainLoop();
 
         free(psi2);
         free(psi);
         free(ipiv);
+
 
         return 0;
 
