@@ -136,13 +136,33 @@ void potential(lapack_complex_double *psi, size_t rr)
         for (int j = 0; j < N; j++) {
                 for (int i = 0; i < N; i++) {
                         if (i == N/2) {
-                                if ((j > N/3-N/16 && j < N/3+N/16)
-                                        || (j > 2*N/3-N/16 && j < 2*N/3+N/16)) {
+                                if ((j > 0 && j < 2*N/5-N/32)
+                                        ||
+                                     (j > 2*N/5+N/32 && j < 3*N/5-N/32) ||
+                                     (j > 3*N/5+N/32)) {
                                         idx = j*N + i;
                                         psi[idx] -= 1.0*psi[idx];
                                         //mat[idx * rr + idx] -= 1.0;
                                 }
                         }
+                }
+        }
+}
+
+
+void visualize_potential(lapack_complex_double *vpsi, lapack_complex_double *psi, size_t rr)
+{
+        size_t idx;
+        memcpy(vpsi, psi, rr*sizeof(lapack_complex_double));
+        //memset(vpsi, 0, rr*sizeof(lapack_complex_double));
+        int i = N/2;
+        for (int j = 0; j < N; j++) {
+                if ((j > 0 && j < 2*N/5-N/32)
+                        ||
+                     (j > 2*N/5+N/32 && j < 3*N/5-N/32) ||
+                     (j > 3*N/5+N/32)) {
+                        idx = j*N + i;
+                        vpsi[idx] = rr;
                 }
         }
 }
@@ -224,8 +244,10 @@ int main(void)
                 for (int i = 0; i < rr; i++) {
                         psi[i] /= norm;
                 }
-                if (i % 200 == 0) {
-                        psi_to_file(dat, psi);
+
+                if (i % 1000 == 0) {
+                        visualize_potential(psi2, psi, rr);
+                        psi_to_file(dat, psi2);
                 }
                 printf("time step %d\n", i);
         }
