@@ -120,7 +120,9 @@ void psi_to_file(FILE *dat, lapack_complex_double *psi)
                 double y = 1.0 / N * iy;
                 fprintf(dat, "%.6f ", y);
                 for (int ix = 0; ix < N; ix++) {
-                        fprintf(dat, "%.6f ", psi[iy*N+ix]*conj(psi[iy*N+ix]));
+                        fprintf(dat, "%.6f ", 1.0/rr *
+                                lapack_complex_double_real(
+                                        v[iy*N+ix]*conj(v[iy*N+ix])));
                 }
                 fprintf(dat, "\n");
         }
@@ -216,7 +218,8 @@ int main(void)
                       lda, psi, 1, &beta, psi, 1); */
                 double norm = 0.0;
                 for (int i = 0; i < rr; i++) {
-                        norm += conj(psi[i])*psi[i];
+                        /* we sum over  (psi*_ij psi_ij dx dy) */
+                        norm += conj(psi[i])*psi[i]*1.0/rr;
                 }
                 for (int i = 0; i < rr; i++) {
                         psi[i] /= norm;
