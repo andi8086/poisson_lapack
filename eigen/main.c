@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 /* one side of the square */
-#define X 48 
+#define X 4
 /* 2D laplace matrix has X^4 elements (N*N)*/
 #define N (X*X)
 
@@ -219,8 +219,8 @@ int main(void)
         CDOUBLE *m = malloc_cmatrix(N);
         laplace2d(N, X, m);
 
-       // CDOUBLE *m_old = malloc_cmatrix(N);
-        //memcpy(m_old, m, sizeof(lapack_complex_double) * N * N);
+        CDOUBLE *m_old = malloc_cmatrix(N);
+        memcpy(m_old, m, sizeof(lapack_complex_double) * N * N);
 
         double *d = malloc(sizeof(double) * N);
         /* we need N-1 elements for zhetrd, but one additional for zstegr */
@@ -240,28 +240,10 @@ int main(void)
         
         printf("%d eigen values found.\n", num_eigenvals);
 
-        free(eigen_vecs);
-
-//        free(m_old);
-//        free(tmp);
-        free(Q);
-        free(eigen_values);
-        free(issupz);
-        free(e);
-        free(d);
-        free(m);
-
-        return 0;
-}
-        
-
-
-
-
         /* Retransform eigen vectors with Q to match base of A */
         /* Q T Q^H Q v = A Q v = lambda Q v,
            hence  v' = Qv */
-/*
+
         lapack_complex_double *tmp = malloc(sizeof(lapack_complex_double) * N * 2);
         for (int i = 0; i < N; i++) {
                 printf("lambda_%d = %.5f\n", i, eigen_values[i]);
@@ -295,4 +277,18 @@ int main(void)
                 printf(" ]\n");
 
         }
-*/
+
+        free(eigen_vecs);
+
+        free(m_old);
+        free(tmp);
+        free(Q);
+        free(eigen_values);
+        free(issupz);
+        free(e);
+        free(d);
+        free(m);
+
+        return 0;
+}
+
