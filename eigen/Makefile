@@ -1,7 +1,9 @@
 all: test
 
-CFLAGS=$(pkgconf --cflags openblas64)
-LDFLAGS=$(pkgconf --libs openblas64)
+CFLAGS=$(shell pkgconf --cflags openblas64)
+LDFLAGS=$(shell pkgconf --libs openblas64)
+
+CFLAGS += -DLAPACK_ILP64
 
 test: main.c
-	gcc -O3 $(CFLAGS) main.c $(LDFLAGS) -llapacke -o $@
+	gcc -O3 $(CFLAGS) main.c $(LDFLAGS) -o $@
