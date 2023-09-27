@@ -3,14 +3,74 @@
 #include <openblas64/cblas.h>
 #include <string.h>
 #include <stdlib.h>
+#include <GL/glut.h>
+#include <pthread.h>
+
+pthread_mutex_t psi_mutex;
 
 /* one side of the square */
-#define X 4
+#define X 64 
 /* 2D laplace matrix has X^4 elements (N*N)*/
 #define N (X*X)
 
 
 #define CDOUBLE lapack_complex_double
+
+void glcolor_heatmap(double min, double max, double val)
+{
+        float r, g, b;
+        double scale = max - min;
+        double rval = (val - min) / scale;
+        if (rval <= 0) {
+                glColor3f(0.0, 0.0, 0.0);
+                return;
+        }
+
+        if (rval >= 1.0) {
+                glColor3f(1.0, 1.0, 1.0);
+        }
+
+        /* intervals:
+        0..1/4  black to blue
+        1/4..2/4  blue down, green up
+        2/4..3/4  keep green, red up
+        3/4..4/4  keep green and red, blue up */
+        if (rval < 0.25) {
+                glColor3f(0.0, 0.0, rval*4);
+        } else if (rval < 0.5) {
+                glColor3f((rval - 0.25)*4, 0.0, 1.0-(rval - 0.25)*4);
+        } else if (rval < 0.75) {
+                glColor3f(1.0, (rval - 0.5)*4,  0.0);
+        } else {
+                glColor3f(1.0, 1.0, (rval - 0.75)*4);
+        }
+}
+
+CDOUBLE *solution;
+
+void display_frame(void)
+{
+//        glDrawBuffer(GL_BACK);
+        pthread_mutex_lock(&psi_mutex);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        for (int i = 0; i < X-1; i++) {
+                for (int j = 0; j < X-1; j++) {
+                        glBegin(GL_QUADS);
+                                glcolor_heatmap(-0.25, 0.25,
+                                      lapack_complex_double_real(creal(solution[j*X+i])));
+                                glVertex3f(1.0/X*(i+1), 1.0/X*j, 0.0);
+                                glVertex3f(1.0/X*(i+1), 1.0/X*(j+1), 0.0);
+                                glVertex3f(1.0/X*i, 1.0/X*(j+1), 0.0);
+                                glVertex3f(1.0/X*i, 1.0/X*j, 0.0);
+                        glEnd();
+                }
+
+        }
+        glutSwapBuffers();
+        pthread_mutex_unlock(&psi_mutex);
+}
+
+
 
 void print_matrix(lapack_complex_double *m, size_t rr )
 {
@@ -213,14 +273,51 @@ void laplace2d(size_t rr, size_t block_len, CDOUBLE *mat)
 }
 
 
-int main(void)
+CDOUBLE *eigen_vecs;
+CDOUBLE *Q;
+
+int frame_counter = -1;
+int solution_i = 0;
+
+
+void update_frame(int foo)
+{
+
+        glutPostRedisplay();
+
+        frame_counter++;
+        glutTimerFunc(50, update_frame, 0);
+        if (frame_counter % 100) return;
+        /* Evaluate time development */
+        printf("New vector\n");
+        int i = solution_i;
+        pthread_mutex_lock(&psi_mutex);
+
+        /* Retransform eigen vectors with Q to match base of A */
+        /* Q T Q^H Q v = A Q v = lambda Q v,
+           hence  v' = Qv */
+
+           /* i goes from 0 to N-1 */
+        //  store column i of eigen_vecs into row 2 of tmp
+        for (int j = 0; j < N; j++) {
+                solution[N + j] = eigen_vecs[j*N + i];
+        }
+        mat_v(solution, Q, &solution[N], N);
+
+        pthread_mutex_unlock(&psi_mutex);
+        solution_i++;
+        if (solution_i == N) {
+                solution_i = 0;
+        }
+}
+
+
+int main(int argc, char **argv)
 {
 
         CDOUBLE *m = malloc_cmatrix(N);
         laplace2d(N, X, m);
 
-        CDOUBLE *m_old = malloc_cmatrix(N);
-        memcpy(m_old, m, sizeof(lapack_complex_double) * N * N);
 
         double *d = malloc(sizeof(double) * N);
         /* we need N-1 elements for zhetrd, but one additional for zstegr */
@@ -231,57 +328,39 @@ int main(void)
         double *eigen_values = malloc(sizeof(double) * N);
         lapack_int num_eigenvals;
 
-        CDOUBLE *eigen_vecs = malloc_cmatrix(N);
+        eigen_vecs = malloc_cmatrix(N);
         /* Now we can calculate the eigen values and eigen vectors */
-        CDOUBLE *Q = malloc_cmatrix(N); 
+        Q = malloc_cmatrix(N); 
 
         eigenv(N, m, Q, d, e, eigen_vecs, eigen_values, &num_eigenvals, issupz,
                0, 0);
         
         printf("%d eigen values found.\n", num_eigenvals);
 
-        /* Retransform eigen vectors with Q to match base of A */
-        /* Q T Q^H Q v = A Q v = lambda Q v,
-           hence  v' = Qv */
+        pthread_mutex_init(&psi_mutex, NULL);
+        glutInit(&argc, argv);
+        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+        glutInitWindowSize(640, 640);
+        glutInitWindowPosition(100, 100);
+        glutCreateWindow("Laplace Eigenvectors");
 
-        lapack_complex_double *tmp = malloc(sizeof(lapack_complex_double) * N * 2);
-        for (int i = 0; i < N; i++) {
-                printf("lambda_%d = %.5f\n", i, eigen_values[i]);
+        glClearColor(0.0, 0.0, 0.0, 0.0);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+        glutDisplayFunc(display_frame);
 
-                //  store column i of eigen_vecs into row 2 of tmp
-                for (int j = 0; j < N; j++) {
-                        tmp[N + j] = eigen_vecs[j*N + i];
-                }
-                mat_v(tmp, Q, &tmp[N], N);
+        solution = malloc(sizeof(lapack_complex_double) * N * 2);
 
-                printf("ev_%d = [ ", i);
-                for (int j = 0; j < N; j++) {
-                        printf("%.5f + %.5fi", creal(tmp[j]),
-                                cimag(tmp[j]));
-                        if (j < N-1) {
-                                printf(", ");
-                        }
-                }
-                printf(" ]\n");
+        update_frame(0);
+        glutTimerFunc(50, update_frame, 0);
+        glutMainLoop();
 
-                // Test eigenvectors
-                mat_v(&tmp[N], m_old, tmp, N);
-                printf("A ev_%d / lambda_%d = [ ", i, i);
-                for (int j = 0; j < N; j++) {
-                        printf("%.5f + %.5fi", creal(tmp[N+j])/eigen_values[i],
-                                cimag(tmp[N+j])/eigen_values[i]);
-                        if (j < N-1) {
-                                printf(", ");
-                        }
-                }
-                printf(" ]\n");
 
-        }
+        free(solution);
 
         free(eigen_vecs);
 
-        free(m_old);
-        free(tmp);
         free(Q);
         free(eigen_values);
         free(issupz);
