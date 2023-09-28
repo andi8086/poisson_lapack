@@ -8,7 +8,7 @@
 // #include <petscdmlabel.h>
 // #include <petscds.h>
 
-#define X 64
+#define X 16
 #define N (X*X)
 
 
@@ -98,7 +98,7 @@ int main(int argc, char **argv)
 
         PetscCall(EPSSetOperators(eps, A, NULL));
         PetscCall(EPSSetProblemType(eps, EPS_HEP));
-        PetscCall(EPSSetDimensions(eps, N, N+1, N));
+        PetscCall(EPSSetDimensions(eps, 4, 16, N));
         PetscCall(EPSSetFromOptions(eps));
 
         PetscCall(EPSSolve(eps));
@@ -120,6 +120,7 @@ int main(int argc, char **argv)
 
         for (PetscInt i = 0; i < nconv; i++) {
                 PetscCall(EPSGetEigenvector(eps, i, vr, NULL));
+                VecView(vr, PETSC_VIEWER_DRAW_WORLD);
         }
 
         PetscCall(VecDestroy(&vr));
