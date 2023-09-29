@@ -29,17 +29,17 @@ void laplace(size_t rr, lapack_complex_double *mat)
         for (int k = 0; k < rr; k+=N) {
                 /* inner blocks */
                 for (int l = 0; l < N; l++) {
+                        /* diagonal of inner B matrix */
+                        mat[(k+l)*rr + (k+l)] = 4.0;
+                        /* tridiagonal bands */ 
                         if (l > 0) {
                                 mat[(k+l)*rr + (k+l-1)] = -1.0;
                         }
-                        /* diagonal of inner B matrix */
-                        mat[(k+l)*rr + (k+l)] = 4.0;
-                        /* upper tridiagonal elements of inner B matrix */
                         if (l < N - 1) {
                                 mat[(k+l)*rr + (k+l+1)] = -1.0;
                         }
                 }
-                /* upper pentadiagonal band */
+                /* pentadiagonal bands */
                 for (int l = 0; l < N; l++) {
                         if (k > N) {
                                 mat[(k+l)*rr + (k+l-N)] = -1.0; 
